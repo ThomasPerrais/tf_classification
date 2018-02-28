@@ -10,7 +10,7 @@ PAD = "<P_A_D>"
 class Preprocessor(object):
 
     def __init__(self, path, train=True, processing_words=None, processing_class=None,
-                 max_iter=None, max_length=-1):
+                 max_iter=None):
         self.path = path
         self.train = train
         self.processing_words = processing_words
@@ -49,14 +49,15 @@ class Preprocessor(object):
         return self.length
 
 
-def get_vocabulary(preprocessors):
+def get_vocabulary(preprocessors, verbose):
     """
     return the vocabulary associated with a given list of files containing sentences
     as well as the size of the longest sentence
     :param preprocessors: list of preprocessors to extract vocab from
     :return: two sets : vocabulary and list of classes
     """
-    print("Creating vocabulary... ")
+    if verbose:
+        print("Creating vocabulary... ")
     vocab_words = set()
     vocab_classes = set()
     max_length = 0
@@ -67,7 +68,10 @@ def get_vocabulary(preprocessors):
             if len(words) > max_length:
                 max_length = len(words)
             vocab_words.update(words)
-    print("- done. {} tokens - {} classes".format(len(vocab_words), len(vocab_classes)))
+    if verbose:
+        print("- done. {} tokens - {} classes - longest sentence size {}".format(len(vocab_words),
+                                                                                 len(vocab_classes),
+                                                                                 max_length))
     return vocab_words, vocab_classes, max_length
 
 

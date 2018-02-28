@@ -3,6 +3,7 @@
 import codecs
 import os
 import sys
+import getopt
 
 import numpy as np
 
@@ -13,13 +14,14 @@ from utils.progress import Progbar
 
 class TextClassifier(object):
 
-    def __init__(self, directory, filter_sizes, num_filters=100, dropout_keep_prob=0.5, batch_size=50, init_lr=0.025):
+    def __init__(self, directory, filter_sizes, num_filters, dropout_keep_prob, batch_size, init_lr, verbose):
 
         self.directory = directory
         self.dropout_keep_prob = dropout_keep_prob
         self.batch_size = batch_size
         self.best_accuracy = 0
         self.init_lr = init_lr
+        self.verbose = verbose
 
         # Loading vocabulary as dict { word : id }
         self.vocabulary = load_vocabulary(os.path.join(self.directory, "vocabulary.txt"))
@@ -92,7 +94,8 @@ class TextClassifier(object):
         # iterate over dataset
         for i, (x_batch, y_batch) in enumerate(self.minibatches(train=True)):
             train_loss, _ = self.process_batch(x_batch, y_batch, lr)
-            prog.update(i + 1, [("train loss", train_loss)])
+            if self.verbose:
+                prog.update(i + 1, [("train loss", train_loss)])
             # print_progress_and_infos(epoch, i + 1, nbatches, train_loss)
         return self.evaluate_on_dev()
 
@@ -137,27 +140,63 @@ def load_training_set(filename, prop=0.1):
     return x_train[:threshold, :-1], x_train[:threshold, -1], x_train[threshold:, -1], x_train[threshold:, -1]
 
 
-def print_progress_and_infos(epoch, i, nbatches, loss, size=60):
+def usage():
+    print("python train.py -h <help?> -v <verbose?> -e <epochs> -f <filters (comma sep)> -n <number_filters> "
+          "-p <path> -b <batch_size> -l <learning_rate> -d <dropout_keep_proba>")
 
-    percent = i * size // nbatches
-    print('Epoch {} [{}>{}] - train loss : {:0.4f}'.format(epoch, '=' * percent, '-' * (size - percent), loss))
 
-
-def main(args):
+def main():
 
     filters = [3, 4, 5]
+    number_filters = 100
+    batch_size = 50
+    init_lr = 0.025
+    dropout_keep = 0.5
     epochs = 100
-    if len(args) == 0:
-        print("need to specify a folder where training set is stored")
-        sys.exit(2)
-    directory = os.path.expanduser('~/Documents/Projects/Classification/{}'.format(args[0]))
-    if len(args) > 1:
-        extension = args[1]
-        directory = os.path.join(directory, extension)
-    classifier = TextClassifier(directory, filters)
-    if len(args) > 2:
-        epochs = int(args[2])
+    directory = ""
+    verbose = True
+
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "hve:f:n:p:b:l:d:",
+                                   ["help",
+                                    "verbose",
+                                    "epochs",
+                                    "filters=",
+                                    "number_filters=",
+                                    "path=",
+                                    "batch_size=",
+                                    "lr=",
+                                    "dropout="
+                                    ])
+    except getopt.GetoptError as err:
+        print(str(err))
+        usage()
+        sys.exit()
+
+    for o, a in opts:
+        if o in ("-h", "--help"):
+            usage()
+            sys.exit()
+        elif o in ("-v", "--verbose"):
+            verbose = True
+        elif o in ("-n", "--number_filters"):
+            number_filters = int(a)
+        elif o in ("-f", "--filters"):
+            filters = [int(elt.trim()) for elt in a.split(',')]
+        elif o in ("-p", "--path"):
+            directory = a
+        elif o in ("-b", "--batch_size"):
+            batch_size = int(a)
+        elif o in ("-l", "--lr"):
+            init_lr = float(a)
+        elif o in ("-d", "--dropout"):
+            dropout_keep = float(a)
+        else:
+            assert False, "unhandled option"
+
+    classifier = TextClassifier(directory, filters, number_filters, dropout_keep, batch_size, init_lr, verbose)
     classifier.train_model(epochs)
 
+
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()
