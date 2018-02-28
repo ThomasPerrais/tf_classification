@@ -51,7 +51,7 @@ def main():
             lc = True
         elif o in ("-i", "--input_dir"):
             input_dir = os.path.expanduser(a)
-        elif o in ("-l", "--lowercase"):
+        elif o in ("-o", "--output_dir"):
             output_dir = os.path.expanduser(a)
         else:
             assert False, "unhandled option"
