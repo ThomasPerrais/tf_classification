@@ -77,6 +77,9 @@ class TextClassifier(AbstractTextClassifier):
         return
 
     def train_model(self, max_epochs=100):
+        if not self.mode == "trainable":
+            self.model.sess.run(self.model.embedding_init,
+                                feed_dict={self.model.embedding_trained_placeholder: self.embeddings})
         for e in range(max_epochs):
             new_best = self.run_epoch(e, max_epochs)
             if new_best:
@@ -111,8 +114,6 @@ class TextClassifier(AbstractTextClassifier):
         }
         if y_batch is not None:
             feed_dict[self.model.input_y] = y_batch
-        if not self.mode == "trainable":
-            feed_dict[self.model.embedding_trained_placeholder] = self.embeddings
         return feed_dict
 
     def predict_batch(self, x_batch, y_batch=None, lr=None, dropout=-1.):
