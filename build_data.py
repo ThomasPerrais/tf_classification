@@ -4,12 +4,22 @@ import codecs
 import os
 import sys
 import getopt
+import numpy as np
 
 from preprocessing.preprocessor import Preprocessor, load_vocabulary, get_vocabulary, write_vocabulary, \
     create_embeddings, get_classes_preprocessing, get_word_preprocessing, PAD
 
 TRAIN_NAME = 'trainingset.txt'
-EMBEDDINGS_NAME = 'embeddings.sg.ns.bin'
+TEST_NAME = 'testset.txt'
+TRAIN_OUTPUT_NAME = 'train.npy'
+TEST_OUTPUT_NAME = 'test.npy'
+VOCABULARY_NAME = 'vocabulary.txt'
+CLASSES_NAME = 'classes.txt'
+IDS_OUTPUT_NAME = 'test-ids.txt'
+
+EMBEDDINGS_INPUT_NAME = 'embeddings.sg.ns.bin'
+EMBEDDINGS_INPUT_NAME_NG = 'embeddings.sg.ns.ngrams.bin'
+EMBEDDINGS_OUTPUT_NAME = 'embeddings.npy'
 
 
 def usage():
@@ -67,52 +77,79 @@ def main():
         if verbose:
             print("directory {} created".format(output_dir))
 
-    path_training_set = os.path.join(input_dir, TRAIN_NAME)
-    if not os.path.exists(path_training_set):
-        print("training set file is absent ({})".format(path_training_set))
+    path_trainset = os.path.join(input_dir, TRAIN_NAME)
+    path_testset = os.path.join(input_dir, TEST_NAME)
+    if not os.path.exists(path_trainset):
+        print("training set file is absent ({})".format(path_trainset))
+        sys.exit()
+    if not os.path.exists(path_testset):
+        print("test set file is absent ({})".format(path_testset))
         sys.exit()
 
-    prep_train = Preprocessor(path_training_set)
-    size = len(prep_train)
+    path_save_voc_w = os.path.join(output_dir, VOCABULARY_NAME)
+    path_save_voc_c = os.path.join(output_dir, CLASSES_NAME)
+
+    prep_train = Preprocessor(path_trainset)
+    prep_test = Preprocessor(path_testset, train=False)
+    size_train = len(prep_train)
+    size_test = len(prep_test)
     if verbose:
-        print("Starting preprocessing on file of {} sentences".format(size))
-    voc_w, voc_c, max_length = get_vocabulary([prep_train], verbose)
-    path_save_voc_w = os.path.join(output_dir, "vocabulary.txt")
-    path_save_voc_c = os.path.join(output_dir, "classes.txt")
+        print("Starting pre-processing on files of {} sentences".format(size_train + size_test))
+    voc_w, voc_c, max_length = get_vocabulary([prep_train, prep_test], verbose)
     voc_w.add(PAD)
     write_vocabulary(voc_w, path_save_voc_w)
     write_vocabulary(voc_c, path_save_voc_c)
-
     embeddings_size = len(voc_w)
     del voc_w, voc_c, prep_train
 
-    # Loading vocabularies as dictionary
     vocab_words = load_vocabulary(path_save_voc_w)
+
+    # Loading vocabularies as dictionary
     if verbose:
         print("\nvocabulary loaded back ... {} words "
               "(might be different from before due to utf-8 encoding issues...)".format(len(vocab_words)))
     vocab_classes = load_vocabulary(path_save_voc_c)
-
     max_length = min(max_length, max_length_sentence)
     processing_words = get_word_preprocessing(vocab_words, max_length=max_length)
     processing_class = get_classes_preprocessing(vocab_classes)
+    prep_to_int_train = Preprocessor(path_trainset,
+                                     processing_words=processing_words,
+                                     processing_class=processing_class)
+    prep_to_int_test = Preprocessor(path_testset, train=False,
+                                    processing_words=processing_words,
+                                    processing_class=processing_class)
+    train, _ = fill_matrix(size_train, max_length, prep_to_int_train, train=True)
+    test, ids_test = fill_matrix(size_test, max_length, prep_to_int_test, train=False)
+    np.save(os.path.join(output_dir, TRAIN_OUTPUT_NAME), train)
+    np.save(os.path.join(output_dir, TEST_OUTPUT_NAME), test)
+    with codecs.open(os.path.join(output_dir, IDS_OUTPUT_NAME), "w", encoding='utf-8') as f:
+        f.write("\n".join(ids_test))
 
-    prep_to_int = Preprocessor(path_training_set, processing_words=processing_words, processing_class=processing_class)
-    path_save_train_int = os.path.join(output_dir, "training.int.txt")
-    with codecs.open(path_save_train_int, "w", encoding='utf-8') as f:
-        f.write("{}\t{}\n".format(size, max_length + 1))
-        for _, topic, words in prep_to_int:
-            f.write(" ".join([str(elt) for elt in words]))
-            f.write(" ")
-            f.write(str(topic))
-            f.write('\n')
-
-    path_w2v = os.path.join(input_dir, "embeddings.sg.ns.bin")
-    path_ngrams_w2v = os.path.join(input_dir, "embeddings.sg.ns.ngrams.bin")
-    path_save_embeddings = os.path.join(output_dir, "embeddings.npy")
+    path_w2v = os.path.join(input_dir, EMBEDDINGS_INPUT_NAME)
+    path_ngrams_w2v = os.path.join(input_dir, EMBEDDINGS_INPUT_NAME_NG)
+    path_save_embeddings = os.path.join(output_dir, EMBEDDINGS_OUTPUT_NAME)
     min_n = 3
     max_n = 6
     create_embeddings(vocab_words, embeddings_size, path_w2v, path_ngrams_w2v, path_save_embeddings, min_n, max_n)
+
+
+def fill_matrix(size, max_length, prep, train=True):
+
+    ids = []
+    i = 0
+    if train:
+        x = np.zeros((size, max_length + 1))
+    else:
+        x = np.zeros((size, max_length))
+    for id, topic, words in prep:
+        ids.append(id)
+        if train:
+            x[i, :] = words + [topic]
+        else:
+            x[i, :] = words
+        i += 1
+    return x, ids
+
 
 if __name__ == "__main__":
     main()
