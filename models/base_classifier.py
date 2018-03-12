@@ -39,7 +39,7 @@ class AbstractTextClassifier(metaclass=abc.ABCMeta):
         return
 
     @abc.abstractmethod
-    def confusion_matrix(self):
+    def confusion_matrix(self, trainset):
         return
 
     @abc.abstractmethod

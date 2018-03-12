@@ -3,10 +3,14 @@
 import os
 import numpy as np
 import math
-from build_data import EMBEDDINGS_OUTPUT_NAME, VOCABULARY_NAME, TRAIN_OUTPUT_NAME
+from sklearn.metrics import confusion_matrix
+import seaborn as sn
+import pandas as pd
+import matplotlib.pyplot as plt
+from build_data import EMBEDDINGS_OUTPUT_NAME, VOCABULARY_NAME, TRAIN_OUTPUT_NAME, CLASSES_NAME
 
 from graphs.cnn_classification import FixedVectorsCNN, TrainableVectorsCNN, MultiChannelCNN
-from preprocessing.preprocessor import load_vocabulary
+from preprocessing.preprocessor import load_vocabulary, load_classes
 from utils.progress import Progbar
 from .utils import load_training_set
 from .base_classifier import AbstractTextClassifier
@@ -72,9 +76,30 @@ class TextClassifier(AbstractTextClassifier):
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
 
-    def confusion_matrix(self):
-        # TODO : implement confusion matrix
-        return
+    def confusion_matrix(self, trainset):
+        y_pred = []
+        y_true = []
+        for x_batch in self.minibatches(x=trainset):
+            y = x_batch[:, -1]
+            x = x_batch[:, :-1]
+            _, pred = self.predict_batch(x)
+            y_true.extend(y)
+            y_pred.extend(pred)
+        cm = confusion_matrix(y_true, y_pred)
+        return cm
+
+    def save_confusion_matrix(self, cm):
+        path_classes = os.path.join(self.directory, CLASSES_NAME)
+        classes = load_classes(path_classes)
+        if cm.shape[0] != len(classes):
+            print('incompatibility between classes files ({} classes) '
+                  'and confusion matrix ({} classes)'.format(len(classes), cm.shape[0]))
+        df_cm = pd.DataFrame(cm, index=classes, columns=classes)
+        plt.ioff()
+        plt.figure(figsize=(10, 7))
+        sn_heatmap = sn.heatmap(df_cm, annot=True)
+        figure = sn_heatmap.get_figure()
+        figure.savefig(os.path.join(self.directory, "weights", "confusion_matrix.png"))
 
     def train_model(self, max_epochs=100):
         if not self.mode == "trainable":
@@ -83,6 +108,8 @@ class TextClassifier(AbstractTextClassifier):
         for e in range(max_epochs):
             new_best = self.run_epoch(e, max_epochs)
             if new_best:
+                cm = self.confusion_matrix(np.concatenate((self.x_dev, self.y_dev.reshape(-1, 1)), axis=1))
+                self.save_confusion_matrix(cm)
                 self.save_model()
 
     def save_model(self):
@@ -90,12 +117,11 @@ class TextClassifier(AbstractTextClassifier):
         self.model.saver.save(self.model.sess, os.path.join(self.save_dir, "model"))
 
     def evaluate_on_dev(self):
-        accuracies = []
-        for i, (x_batch, y_batch) in enumerate(self.minibatches(train=False)):
-            _, pred = self.predict_batch(x_batch, None, dropout=1.0)
-            accuracy = 100. * sum([p == t for p,t in zip(pred, y_batch)]) / self.batch_size
-            accuracies.append(accuracy)
-        mean_acc = np.mean(accuracies)
+        good_preds = 0
+        for x_batch, y_batch in self.minibatches(train=False):
+            _, pred = self.predict_batch(x_batch, dropout=1.)
+            good_preds += sum([p == t for p, t in zip(pred, y_batch)])
+        mean_acc = 100. * good_preds / self.x_dev.shape[0]
         print("\nscore on dev set : {}".format(mean_acc))
         if mean_acc > self.best_accuracy:
             self.best_accuracy = mean_acc

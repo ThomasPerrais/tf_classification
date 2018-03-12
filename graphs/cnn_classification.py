@@ -96,10 +96,10 @@ class TrainableVectorsCNN(BaseCNN):
             self.scores = tf.nn.xw_plus_b(self.h_drop, W, b, name="scores")
             self.predictions = tf.argmax(self.scores, 1, name="predictions")
 
-    def add_embeddings_layer(self, vocab_size, embedding_size):
+    def add_embeddings_layer(self, vocab_size, embeddings_size):
         # with tf.device('/cpu:0'), tf.name_scope("embedding"):
         with tf.name_scope("embedding"):
-            w_to_train = tf.Variable(tf.random_uniform([vocab_size, embedding_size], -1.0, 1.0),
+            w_to_train = tf.Variable(tf.random_uniform([vocab_size, embeddings_size], -1.0, 1.0),
                                      name="W_to_train")
             self.embedded_words = tf.nn.embedding_lookup(w_to_train, self.input_x)
             self.embedded_words_expanded = tf.expand_dims(self.embedded_words, -1)

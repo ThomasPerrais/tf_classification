@@ -104,6 +104,17 @@ def load_vocabulary(filename):
     return d
 
 
+def load_classes(filename):
+    """
+    create the list of classes
+    :param filename: path where classes are stored
+    :return: list of classes
+    """
+    with codecs.open(filename, "r", encoding='utf-8') as f:
+        classes = [elt.strip() for elt in f.read().splitlines()]
+    return classes
+
+
 def create_embeddings(vocab, embeddings_size, filename_w2v, filename_ngrams_w2v, filename_save,
                       min_n, max_n, start_char="<", end_char=">"):
     """

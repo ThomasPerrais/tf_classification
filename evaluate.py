@@ -55,7 +55,7 @@ def main():
         elif o in ("-m", "--mode"):
             mode = a
         elif o in ("-f", "--filters"):
-            filters = [int(elt.trim()) for elt in a.split(',')]
+            filters = [int(elt.strip()) for elt in a.split(',')]
         elif o in ("-n", "--number_filters"):
             number_filters = int(a)
         elif o in ("-p", "--path"):
