@@ -33,7 +33,7 @@ class TextClassifier(AbstractTextClassifier):
         self.train_size = self.x_train.shape[0]
         self.dev_size = self.x_dev.shape[0]
 
-        self.num_classes = np.max(self.y_train) + 1
+        self.num_classes = max(np.max(self.y_train), np.max(self.y_dev)) + 1
 
         # Loading embeddings
         self.embeddings = np.load(os.path.join(self.directory, EMBEDDINGS_OUTPUT_NAME))
@@ -85,7 +85,7 @@ class TextClassifier(AbstractTextClassifier):
             _, pred = self.predict_batch(x)
             y_true.extend(y)
             y_pred.extend(pred)
-        cm = confusion_matrix(y_true, y_pred)
+        cm = confusion_matrix(y_true, y_pred, labels=range(self.num_classes))
         return cm
 
     def save_confusion_matrix(self, cm):
@@ -95,11 +95,13 @@ class TextClassifier(AbstractTextClassifier):
             print('incompatibility between classes files ({} classes) '
                   'and confusion matrix ({} classes)'.format(len(classes), cm.shape[0]))
         df_cm = pd.DataFrame(cm, index=classes, columns=classes)
-        plt.ioff()
-        plt.figure(figsize=(10, 7))
-        sn_heatmap = sn.heatmap(df_cm, annot=True)
+        plt.figure(figsize=(13, 8))
+        ax = plt.axes()
+        sn_heatmap = sn.heatmap(df_cm, annot=True, ax=ax)
+        ax.set_xlabel("predicted label")
+        ax.set_ylabel("true label")
         figure = sn_heatmap.get_figure()
-        figure.savefig(os.path.join(self.directory, "weights", "confusion_matrix.png"))
+        figure.savefig(os.path.join(self.save_dir, "confusion_matrix.png"))
 
     def train_model(self, max_epochs=100):
         if not self.mode == "trainable":
@@ -212,8 +214,9 @@ class TextClassifier(AbstractTextClassifier):
         for x_batch in self.minibatches(x=testset):
             if soft:
                 score, _ = self.predict_batch(x_batch, dropout=1.)
+                results[current:current + x_batch.shape[0], :] = score
             else:
                 _, score = self.predict_batch(x_batch, dropout=1.)
-            results[current:current + x_batch.shape[0], :] = score
+                results[current:current + x_batch.shape[0], :] = score.reshape(-1, 1)
             current += x_batch.shape[0]
         return results

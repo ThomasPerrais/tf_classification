@@ -104,14 +104,15 @@ def load_vocabulary(filename):
     return d
 
 
-def load_classes(filename):
+def load_classes(filename, class_pattern="__label__::"):
     """
     create the list of classes
     :param filename: path where classes are stored
+    :param class_pattern: pattern to find classes in text file that should be removed afterward
     :return: list of classes
     """
     with codecs.open(filename, "r", encoding='utf-8') as f:
-        classes = [elt.strip() for elt in f.read().splitlines()]
+        classes = [elt.strip().replace(class_pattern, "") for elt in f.read().splitlines()]
     return classes
 
 

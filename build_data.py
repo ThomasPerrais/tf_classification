@@ -79,6 +79,7 @@ def main():
 
     path_trainset = os.path.join(input_dir, TRAIN_NAME)
     path_testset = os.path.join(input_dir, TEST_NAME)
+
     if not os.path.exists(path_trainset):
         print("training set file is absent ({})".format(path_trainset))
         sys.exit()
